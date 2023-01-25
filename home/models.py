@@ -13,7 +13,6 @@ from django.dispatch import receiver
 
 def generate_bd_phone_number():
     
-   
     bd_phone_number = "+8801"
     for i in range(1):
         bd_phone_number += str(random.randint(4, 9))

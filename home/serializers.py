@@ -25,7 +25,7 @@ class CustomerSerializer(serializers.ModelSerializer):
     payments = serializers.SerializerMethodField()
     class Meta:
         model = Customer
-        fields = ('name','email' ,'address','phone_numbers', 'primary_phone_number', 'subscription','subscriptioncancel', 'payments')
+        fields = ('phone_number','name','email' ,'address','phone_numbers', 'primary_phone_number', 'subscription','subscriptioncancel', 'payments')
     
     #Getting Phone Number 
     def get_phone_numbers(self, obj):
