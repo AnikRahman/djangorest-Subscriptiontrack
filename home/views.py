@@ -1,6 +1,6 @@
 from rest_framework import viewsets
-from home.models import Customer
-from home.serializers import CustomerSerializer
+from home.models import Customer, Payment, PlanChange
+from home.serializers import CustomerSerializer, PaymentSerializer, PlanChangeSerializer
 from django.shortcuts import render
 from rest_framework import viewsets
 from rest_framework import status
@@ -83,3 +83,30 @@ class SubscriptionCancellationViewSet(viewsets.ModelViewSet):
         else:
             raise serializers.ValidationError('This subscription cannot be cancelled')
   
+
+
+  
+
+#Payment Viweset                                                                                                                    
+
+
+
+class PaymentViewset(viewsets.ModelViewSet):
+  serializer_class = PaymentSerializer
+  queryset = Payment.objects.all()  
+  def post(self, request, *args, **kwargs):
+   serializer = PaymentSerializer(data=request.data)
+   serializer.is_valid(raise_exception=True)
+   payment = serializer.save()
+   payment.charge_with_stripe(request.data['stripe_token'])
+   return Response({'message': 'Payment successful'}, status=status.HTTP_201_CREATED)
+
+
+
+
+  
+#PlanChange 
+ 
+class PlanchangeViewSet(viewsets.ModelViewSet):
+    serializer_class = PlanChangeSerializer
+    queryset = PlanChange.objects.all()

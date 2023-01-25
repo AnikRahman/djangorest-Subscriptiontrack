@@ -2,7 +2,8 @@ from django.db import models
 import random
 import datetime
 from dateutil.relativedelta import relativedelta
-
+import stripe
+from django.conf import settings
 
 # Bangladesh phone number format: +880 xxxx-xxx-xxx
 
@@ -85,3 +86,36 @@ class SubscriptionCancellation(models.Model):
     cancel_date = models.DateTimeField(auto_now_add=True)
     reason = models.TextField()
     
+
+#Plan change track  
+class PlanChange(models.Model):
+   subscription = models.ForeignKey(Subscription, on_delete=models.CASCADE)
+   old_plan = models.ForeignKey(Plan, on_delete=models.CASCADE, related_name='old_plan')
+   new_plan = models.ForeignKey(Plan, on_delete=models.CASCADE, related_name='new_plan')
+   change_date = models.DateTimeField(auto_now_add=True)    
+
+#Payment Model
+class Payment(models.Model):
+    subscription = models.OneToOneField(Subscription, on_delete=models.CASCADE)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    payment_date = models.DateTimeField(auto_now_add=True)
+    stripe_charge_id = models.CharField(max_length=255) 
+    
+    def save(self, *args, **kwargs):
+      self.amount = self.subscription.plan.price
+      super().save(*args, **kwargs)
+
+    def charge_with_stripe(self, stripe_token):
+        stripe.api_key = settings.STRIPE_SECRET_KEY
+       
+        try:
+         charge = stripe.Charge.create(
+            amount=int(self.amount * 100),
+            currency='usd',
+            source=stripe_token,
+            description='Payment for subscription'
+        )
+         self.stripe_charge_id = charge.id
+         self.save()
+        except stripe.error.CardError as e:
+         raise ValueError(e)

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import  Customer
+from .models import  Customer, Payment, PlanChange
 import datetime
 from rest_framework import serializers
 from .models import  Company, Customer, PhoneNumber, Plan, Subscription, SubscriptionCancellation
@@ -53,7 +53,13 @@ class CustomerSerializer(serializers.ModelSerializer):
       except (AttributeError, SubscriptionCancellation.DoesNotExist):
          return None
 
-
+    def get_payments(self, obj):
+        try:
+          payments = Payment.objects.filter(subscription__customer=obj)
+          return PaymentSerializer(payments, many=True).data
+        except Subscription.DoesNotExist:
+            return None   
+            
     
             
 
@@ -119,4 +125,23 @@ class SubscriptionCancellationSerializer(serializers.ModelSerializer):
         model = SubscriptionCancellation
         fields = ('subscription', 'cancel_date','reason')
  
+
+#Payment Serializer           
+
+class PaymentSerializer(serializers.ModelSerializer):
+  class Meta:
+   model = Payment
+   fields = ('subscription', 'amount', 'stripe_charge_id')
+   read_only_fields = ('amount', 'stripe_charge_id')
+
+
+
+
+#Plan change
+
+class PlanChangeSerializer(serializers.ModelSerializer):
+  class Meta:
+   model = PlanChange
+   fields = '__all__'
+    
             
