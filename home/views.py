@@ -50,7 +50,8 @@ class PhoneNumberViewSet(viewsets.ModelViewSet):
 class SubscriptionViewSet(viewsets.ModelViewSet):
     serializer_class = SubscriptionSerializer
     queryset = Subscription.objects.all()
-
+    
+    #uodating start date and end date
     def update(self, request, *args, **kwargs):
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=True)
@@ -73,6 +74,7 @@ class SubscriptionCancellationViewSet(viewsets.ModelViewSet):
     serializer_class = SubscriptionCancellationSerializer
     queryset = SubscriptionCancellation.objects.all()
     
+    # checking if subscription is_cancelled true or not.
     def perform_create(self, serializer):
         subscription = serializer.validated_data.get('subscription')
         if subscription.plan.can_cancel:

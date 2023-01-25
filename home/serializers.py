@@ -27,32 +27,39 @@ class CustomerSerializer(serializers.ModelSerializer):
         model = Customer
         fields = ('name','email' ,'address','phone_numbers', 'primary_phone_number', 'subscription','subscriptioncancel', 'payments')
     
+    #Getting Phone Number 
     def get_phone_numbers(self, obj):
         try:
            phone_numbers = PhoneNumber.objects.filter(customer=obj)
            return PhoneNumberSerializer(phone_numbers, many=True).data
         except PhoneNumber.DoesNotExist:
-            return None    
+            return None  
+    
+    #Getting Primary Phone Number           
     def get_primary_phone_number(self, obj):
         try:
            primary_phone_number = PhoneNumber.objects.get(customer=obj, is_primary=True)
            return PhoneNumberSerializer(primary_phone_number).data
         except PhoneNumber.DoesNotExist:
             return None
+    
+    #Getting Subscription        
     def get_subscription(self, obj):
       subscription = Subscription.objects.filter(customer=obj).last()
       if subscription:
         return SubscriptionSerializer(subscription).data
       return None
     
-    
+     
+    #Getting Subscription  Cancel
     def get_subscriptioncancel(self, obj):
       try:
           subscription = Subscription.objects.filter(customer=obj,is_cancelled=True).last()
           return SubscriptionCancellationSerializer(subscription.subscriptioncancellation).data
       except (AttributeError, SubscriptionCancellation.DoesNotExist):
          return None
-
+   
+    #Getting Payments
     def get_payments(self, obj):
         try:
           payments = Payment.objects.filter(subscription__customer=obj)
@@ -82,7 +89,8 @@ class PhoneNumberSerializer(serializers.ModelSerializer):
     class Meta:
         model = PhoneNumber
         fields = '__all__'
-
+    
+    #Validating if Customer already have a Primary Number
     def validate(self, data):
         if data.get('is_primary'):
             if PhoneNumber.objects.filter(customer=data.get('customer'), is_primary=True).exists():
@@ -99,6 +107,7 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         model = Subscription
         fields = ('id','customer','plan', 'start_date', 'end_date', 'is_cancelled')
     
+    #Validating if Customer already have a Subscription
     def validate(self, data):
         customer = data.get('customer')
         qs = Subscription.objects.filter(customer=customer, end_date__gte=datetime.date.today(), is_cancelled=False)
@@ -106,6 +115,8 @@ class SubscriptionSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('Customer already has an active subscription')
         return data
     
+      
+    #Validating update when customer don't match ,and end date = start date + contract duration
     def update(self, instance, validated_data):
         
         if 'customer'not in validated_data:
@@ -137,7 +148,7 @@ class PaymentSerializer(serializers.ModelSerializer):
 
 
 
-#Plan change
+#Plan  Change  Serializer
 
 class PlanChangeSerializer(serializers.ModelSerializer):
   class Meta:

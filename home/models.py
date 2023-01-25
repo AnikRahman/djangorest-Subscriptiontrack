@@ -1,11 +1,14 @@
+import datetime
+
 from django.db import models
 import random
-import datetime
 from dateutil.relativedelta import relativedelta
 import stripe
 from django.conf import settings
+from django.db.models.signals import pre_save
+from django.dispatch import receiver
 
-# Bangladesh phone number format: +880 xxxx-xxx-xxx
+# Bangladesh phone number format: +880 xxxx-xxx-xxx CUstom function to genreated number
 
 
 def generate_bd_phone_number():
@@ -22,7 +25,7 @@ def generate_bd_phone_number():
         bd_phone_number += str(random.randint(0, 9))
     return bd_phone_number
 
-#Customer Model
+# Customer Model
 class Customer(models.Model):
     phone_number = models.CharField(primary_key=True, max_length=20, default=generate_bd_phone_number)
     name = models.CharField(max_length=100)
@@ -32,7 +35,7 @@ class Customer(models.Model):
         return self.phone_number
 
 
-#Plan Model
+# Plan Model
 class Plan(models.Model):
     name = models.CharField(max_length=100)
     price = models.DecimalField(max_digits=10, decimal_places=2)
@@ -42,7 +45,8 @@ class Plan(models.Model):
     def __str__(self):
         return self.name         
 
-#Company Model
+
+# Company Model
 class Company(models.Model):
     name = models.CharField(max_length=100)
     address = models.CharField(max_length=255)
@@ -50,13 +54,15 @@ class Company(models.Model):
     def __str__(self):
         return self.name
 
-#PhoneNumber Model
+
+# PhoneNumber Model
 class PhoneNumber(models.Model):
     number = models.CharField(primary_key=True, max_length=20, default=generate_bd_phone_number)
     customer = models.ForeignKey(Customer, on_delete=models.CASCADE)
     company = models.ForeignKey(Company, on_delete=models.CASCADE)
     is_primary = models.BooleanField(default=False)
-
+    
+    
     def save(self, *args, **kwargs):
         if self.is_primary:
             PhoneNumber.objects.filter(customer=self.customer, is_primary=True).update(is_primary=False)
@@ -64,7 +70,7 @@ class PhoneNumber(models.Model):
 
 
 
-#Subscription Model
+# Subscription Model
 class Subscription(models.Model):
     customer = models.ForeignKey(Customer, on_delete=models.CASCADE)
     plan = models.ForeignKey(Plan, on_delete=models.CASCADE)
@@ -72,6 +78,7 @@ class Subscription(models.Model):
     end_date = models.DateField()
     is_cancelled = models.BooleanField(default=False)
     
+    #saving end date duration from  plan contract duration in months
     def save(self, *args, **kwargs):
        if self.plan and not self.end_date:
         months = self.plan.contract_duration
@@ -79,7 +86,7 @@ class Subscription(models.Model):
        super().save(*args, **kwargs)      
 
 
-#Subscription Cancel Model
+# Subscription Cancel Model
 
 class SubscriptionCancellation(models.Model):
     subscription = models.OneToOneField(Subscription, on_delete=models.CASCADE)
@@ -87,24 +94,26 @@ class SubscriptionCancellation(models.Model):
     reason = models.TextField()
     
 
-#Plan change track  
+# Plan change track  
 class PlanChange(models.Model):
    subscription = models.ForeignKey(Subscription, on_delete=models.CASCADE)
    old_plan = models.ForeignKey(Plan, on_delete=models.CASCADE, related_name='old_plan')
    new_plan = models.ForeignKey(Plan, on_delete=models.CASCADE, related_name='new_plan')
    change_date = models.DateTimeField(auto_now_add=True)    
 
-#Payment Model
+# Payment Model
 class Payment(models.Model):
     subscription = models.OneToOneField(Subscription, on_delete=models.CASCADE)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     payment_date = models.DateTimeField(auto_now_add=True)
     stripe_charge_id = models.CharField(max_length=255) 
     
+    #Saving amount from plan price
     def save(self, *args, **kwargs):
       self.amount = self.subscription.plan.price
       super().save(*args, **kwargs)
-
+    
+    #Stripe charge
     def charge_with_stripe(self, stripe_token):
         stripe.api_key = settings.STRIPE_SECRET_KEY
        
@@ -119,3 +128,15 @@ class Payment(models.Model):
          self.save()
         except stripe.error.CardError as e:
          raise ValueError(e)
+
+
+
+# Plan change pre save
+@receiver(pre_save, sender=Subscription)
+def log_plan_change(sender, instance, **kwargs):
+    try:
+        old_plan = Subscription.objects.get(pk=instance.pk).plan
+    except Subscription.DoesNotExist:
+        return
+    if old_plan != instance.plan:
+        PlanChange.objects.create(subscription=instance, old_plan=old_plan, new_plan=instance.plan)
